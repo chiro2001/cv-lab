@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 
 def dot_product(a, b):
@@ -23,7 +24,7 @@ def dot_product(a, b):
     """
     out = None
     ### YOUR CODE HERE
-    pass
+    out = np.dot(a.T, b)
     ### END YOUR CODE
     return out
 
@@ -45,7 +46,12 @@ def complicated_matrix_function(M, a, b):
     """
     out = None
     ### YOUR CODE HERE
-    pass
+    left = np.matmul(a.T, b)
+    # WHY TRANSPOSE?
+    right = np.matmul(M, a).T
+    # print('lef=', left)
+    # print('right=', right)
+    out = np.matmul(left, right)
     ### END YOUR CODE
 
     return out
@@ -66,7 +72,7 @@ def eigen_decomp(M):
     w = None
     v = None
     ### YOUR CODE HERE
-    pass
+    w, v = np.linalg.eig(M)
     ### END YOUR CODE
     return w, v
 
@@ -96,7 +102,7 @@ def euclidean_distance_native(u, v):
     #     sum.
 
     ### YOUR CODE HERE
-    pass
+    return math.sqrt(sum([abs(d[0] - d[1])**2 for d in zip(u, v)]))
     ### END YOUR CODE
 
 
@@ -128,7 +134,7 @@ def euclidean_distance_numpy(u, v):
     #     sum.
 
     ### YOUR CODE HERE
-    pass
+    return np.sqrt(np.sum(np.abs(u - v)**2))
     ### END YOUR CODE
 
 
@@ -152,6 +158,8 @@ def get_eigen_values_and_vectors(M, k):
     eigenvalues = []
     eigenvectors = []
     ### YOUR CODE HERE
-    pass
+    w, v = eigen_decomp(M)
+    eigenvectors = v[:k]
+    eigenvalues = w[:k]
     ### END YOUR CODE
     return eigenvalues, eigenvectors
