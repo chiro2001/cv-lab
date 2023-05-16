@@ -20,7 +20,15 @@ def conv_nested(image, kernel):
     out = np.zeros((Hi, Wi))
 
     ### YOUR CODE HERE
-    pass
+    def clamp(x, y):
+        if x < 0 or x >= Hi or y < 0 or y >= Wi:
+            return 0
+        return image[x, y]
+    for i in range(Hi):
+        for j in range(Wi):
+            for k in range(Hk):
+                for l in range(Wk):
+                    out[i, j] += clamp(i - k + Hk//2, j - l + Wk//2) * kernel[k, l]
     ### END YOUR CODE
 
     return out
@@ -47,7 +55,7 @@ def zero_pad(image, pad_height, pad_width):
     out = None
 
     ### YOUR CODE HERE
-    pass
+    out = np.pad(image, ((pad_height, pad_height), (pad_width, pad_width)))
     ### END YOUR CODE
     return out
 
@@ -76,7 +84,14 @@ def conv_fast(image, kernel):
     out = np.zeros((Hi, Wi))
 
     ### YOUR CODE HERE
-    pass
+    padded = zero_pad(image, Hk//2, Wk//2)
+    flipped = np.flip(kernel)
+    # use vectorize to speed up... maybe
+    f = np.vectorize(lambda i, j: np.sum(padded[i:(i+Hk), j:(j+Wk)] * flipped))
+    out = f(np.arange(Hi)[:, np.newaxis], np.arange(Wi))
+    # for i in range(Hi):
+    #     for j in range(Wi):
+    #         out[i, j] += np.sum(padded[i:(i+Hk), j:(j+Wk)] * flipped)
     ### END YOUR CODE
 
     return out
@@ -93,10 +108,9 @@ def cross_correlation(f, g):
     Returns:
         out: numpy array of shape (Hf, Wf).
     """
-
     out = None
     ### YOUR CODE HERE
-    pass
+    out = conv_fast(f, np.flip(g))
     ### END YOUR CODE
 
     return out
@@ -118,7 +132,7 @@ def zero_mean_cross_correlation(f, g):
 
     out = None
     ### YOUR CODE HERE
-    pass
+    out = cross_correlation(f, g - np.mean(g))
     ### END YOUR CODE
 
     return out
@@ -142,7 +156,27 @@ def normalized_cross_correlation(f, g):
 
     out = None
     ### YOUR CODE HERE
-    pass
+    Hf, Wf = f.shape
+    Hg, Wg = g.shape
+    padded = zero_pad(f, Hg//2, Wg//2)
+    g_mean = np.mean(g)
+    g2 = g - g_mean
+    g_std = np.std(g)
+    def calculate(i, j):
+        f_sub = padded[i:(i+Hg), j:(j+Wg)]
+        return np.sum((f_sub - np.mean(f_sub)) * g2) / (np.std(f_sub) * g_std)
+    f = np.vectorize(calculate)
+    out = f(np.arange(Hf)[:, np.newaxis], np.arange(Wf))
+    # for i in range(Hf):
+    #     for j in range(Wf):
+    #         f_sub = padded[i:(i+Hg), j:(j+Wg)]
+    #         out[i, j] = np.sum((f_sub - np.mean(f_sub)) * (g - np.mean(g))) / (np.std(f_sub) * np.std(g))
+    
+    # out = zero_mean_cross_correlation(f, g) / np.std(g)
+    # for i in range(Hf):
+    #     for j in range(Wf):
+    #         f_sub = f[i:(i+Hg), j:(j+Wg)]
+    #         out[i, j] /= np.std(f_sub)
     ### END YOUR CODE
 
     return out
