@@ -43,7 +43,7 @@ def kmeans(features, k, num_iters=500):
         assignments[idxs[i]] = i + 1
 
     def get_distance(a, b):
-        return np.sqrt(np.sum((a - b) ** 2))
+        return np.sum((a - b) ** 2)
 
     def get_neighbors(idx: int):
         dis = np.array([get_distance(features[idx], features[i])
@@ -82,6 +82,10 @@ def kmeans(features, k, num_iters=500):
                 done = False
                 assignments[i] = c
                 print('set', i, c)
+        # move new center to the center of the cluster
+        for i in range(k):
+            if i + 1 in assignments:
+                centers[i] = np.mean(features[assignments == i + 1], axis=0)
         if done:
             break
     assignments = assignments[assignments > 0] - 1
@@ -97,24 +101,28 @@ def kmeans(features, k, num_iters=500):
     return assignments
 
 # Clustering Methods for colorful image
-def color_get_distance(a, b):
-        return np.sqrt(np.sum((a - b) ** 2))
 
-def color_get_neighbors(x: int, y: int, N: int, M: int, features, k: int):
+
+def color_get_distance(a, b):
+    return np.sum((a - b) ** 2)
+
+
+def color_get_neighbors(x: int, y: int, N: int, M: int, features, k: int, D: int = 10):
+    dis_others = np.full((N, M), 99999999, dtype=np.uint32)
+    target_shape = dis_others[max(0, x - D):min(N, x + D + 1),
+                             max(0, y - D):min(M, y + D + 1)].shape
     dis = np.array([[color_get_distance(features[x, y], features[i, j])
-                    for j in range(M)] for i in range(N)])
+                    for i in range(max(0, x - D), min(N, x + D + 1))] for j in range(max(0, y - D), min(M, y + D + 1))], dtype=np.uint32)\
+        .reshape(target_shape)
+    dis_others[max(0, x - D):min(N, x + D + 1),
+              max(0, y - D):min(M, y + D + 1)] = dis
+    dis = dis_others
     dis[x, y] = 999999999
     # print('dis', dis.shape, dis, assignments.shape)
     s = np.dstack(np.unravel_index(
         np.argsort(dis.ravel()), (N, M))).reshape(-1, 2)
-    # print('s', s, s.shape)
-    # print(dis[s[:, 0], s[:, 1]])
-    # available_assignments = assignments[s[:, 0], s[:, 1]] > 0
-    # print('available_assignments', available_assignments, np.all(available_assignments))
-    # f = s[assignments[s[:, 0], s[:, 1]] > 0]
-    f = s
-    # print(f'[x={x}, y={y}] f', f[:k], assignments[f][:k], dis[f][:k])
-    return np.array(f[:k])
+    return np.array(s[:k])
+
 
 def color_classify(x: int, y: int, N: int, M: int, features, k: int, assignments) -> int:
     neighbors = color_get_neighbors(x, y, N, M, features, k)
@@ -132,26 +140,25 @@ def color_classify(x: int, y: int, N: int, M: int, features, k: int, assignments
     # print('b', b, 'r', r)
     return r
 
+
 def color_handle_process(i) -> int:
     x, y, N, M, features, k, assignments, n = i
     r = assignments[x, y]
     c = color_classify(x, y, N, M, features, k, assignments)
     # print('c', c, 'assignments[x, y]', assignments[x, y])
     if r != c and c != 0:
-        print(f'[n={n}] set ({x}, {y}) = {c}')
+        # print(f'[n={n}] set ({x}, {y}) = {c}')
         return c
     return r
 
-def kmeans_color(features, k, num_iters=500):
+
+def kmeans_color(features, k, num_iters=3):
     print(features.shape)
     N, M, _ = features.shape
     print(f'N={N}, M={M}')
     assignments = np.zeros((N, M), dtype=np.uint32)
     # Like the kmeans function above
     # YOUR CODE HERE
-
-    def get_distance(a, b):
-        return np.sqrt(np.sum((a - b) ** 2))
     idxs = np.random.choice(N, size=(k, 2), replace=False)
     print('idxs', idxs)
 
@@ -160,79 +167,28 @@ def kmeans_color(features, k, num_iters=500):
     for i in range(len(idxs)):
         assignments[idxs[i][0], idxs[i][1]] = i + 1
 
-    def get_neighbors(x: int, y: int):
-        dis = np.array([[get_distance(features[x, y], features[i, j])
-                       for j in range(M)] for i in range(N)])
-        dis[x, y] = 999999999
-        # print('dis', dis.shape, dis, assignments.shape)
-        s = np.dstack(np.unravel_index(
-            np.argsort(dis.ravel()), (N, M))).reshape(-1, 2)
-        # print('s', s, s.shape)
-        # print(dis[s[:, 0], s[:, 1]])
-        # available_assignments = assignments[s[:, 0], s[:, 1]] > 0
-        # print('available_assignments', available_assignments, np.all(available_assignments))
-        # f = s[assignments[s[:, 0], s[:, 1]] > 0]
-        f = s
-        # print(f'[x={x}, y={y}] f', f[:k], assignments[f][:k], dis[f][:k])
-        return np.array(f[:k])
-
     # assign each point to the closest center
     for j in range(M):
         for i in range(N):
-            dis = [get_distance(features[i, j], centers[l]) for l in range(k)]
+            dis = [color_get_distance(features[i, j], centers[l])
+                   for l in range(k)]
             # print('dis', dis)
             m = np.argmin(dis)
             assignments[i, j] = m + 1
 
-    def classify(x: int, y: int) -> int:
-        neighbors = get_neighbors(x, y)
-        # print('neighbors', neighbors)
-        # print('assignments[neighbors[:, 0], neighbors[:, 1]]',
-        #       assignments[neighbors[:, 0], neighbors[:, 1]])
-        b = np.bincount(assignments[neighbors[:, 0], neighbors[:, 1]])
-        r = 0
-        if np.sum(b == np.max(b)) > 1:
-            npi = np.where((b == np.max(b)) == True)[0][0] - 1
-            # print('npi', npi)
-            r = assignments[neighbors[npi, 0], neighbors[npi, 1]]
-        else:
-            r = np.argmax(b)
-        # print('b', b, 'r', r)
-        return r
-    
-    def handle_process(i) -> int:
-        x, y, r = i
-        c = classify(x, y)
-        # print('c', c, 'assignments[x, y]', assignments[x, y])
-        if r != c and c != 0:
-            print(f'[n={n}] set', x, y, c)
-            return c
-        return r
-
     for n in range(num_iters):
         done = True
-        # li = np.array([[(x, y) for x in range(N)]
-        #               for y in range(M)]).reshape(-1, 2)
-        # random.shuffle(li)
-        assignments_copy = assignments.copy()
-        # for i in li:
-        #     x, y = i
-        #     c = classify(x, y)
-        #     # print('c', c, 'assignments[x, y]', assignments[x, y])
-        #     if assignments[x, y] != c and c != 0:
-        #         done = False
-        #         assignments_copy[x, y] = c
-        #         print(f'[n={n}] set', i, c)
+        # assignments_copy = assignments.copy()
         li = [[(x, y, N, M, features, k, assignments, n) for x in range(N)]
-                      for y in range(M)]
+              for y in range(M)]
         li = [item for sublist in li for item in sublist]
-        # print(li)
+        result = np.zeros((N * M), dtype=np.uint32)
         with multiprocessing.Pool(16) as pool:
             result = np.array(pool.map(color_handle_process, li))
-            # if np.any(result == 0):
-            print('result', result)
-            
-        assignments = assignments_copy
+        result = result.reshape(N, M)
+        print(f'[n={n}] result', result)
+        done = np.sum(assignments != result) == 0
+        assignments = result
         if done:
             break
     assignments = assignments - 1
